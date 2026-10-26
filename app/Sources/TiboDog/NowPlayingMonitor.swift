@@ -77,6 +77,21 @@ final class NowPlayingMonitor: ObservableObject {
         return nil
     }
 
+    /// Runs the adapter (same pid, via exec) with a tiny watcher beside it that ends the adapter once
+    /// TiboDog is gone, so a crash or `kill -9` never leaves a perl process streaming to nobody.
+    static let watchdog = #"""
+    my $app = getppid(); my $adapter = $$;
+    if (fork() == 0) {
+        open STDOUT, '>', '/dev/null'; open STDIN, '<', '/dev/null';
+        while (1) {
+            sleep 1;
+            exit 0 unless kill 0, $adapter;
+            if (!kill 0, $app) { kill 'TERM', $adapter; exit 0 }
+        }
+    }
+    exec '/usr/bin/perl', @ARGV or die "exec: $!";
+    """#
+
     // MARK: Lifecycle
 
     func start() {
@@ -100,7 +115,7 @@ final class NowPlayingMonitor: ObservableObject {
         }
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
-        proc.arguments = [paths.script.path, paths.framework.path, "stream", "--debounce=150"]
+        proc.arguments = ["-e", Self.watchdog, paths.script.path, paths.framework.path, "stream", "--debounce=150"]
         let p = Pipe()
         proc.standardOutput = p
         proc.standardError = FileHandle.nullDevice

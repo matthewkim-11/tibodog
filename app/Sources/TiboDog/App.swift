@@ -70,9 +70,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: NotchPanel?
     private var geometry: NotchGeometry?
     private var observers: [Any] = []
+    private var signalSources: [DispatchSourceSignal] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        quitOnSignals()
         let store = UsageStore.shared
         store.start()
         rebuildPanel()
@@ -137,6 +139,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .draw(in: NSRect(x: 0, y: 0, width: cw, height: ch), from: src, operation: .copy, fraction: 1)
         NSGraphicsContext.restoreGraphicsState()
         return out
+    }
+
+    /// `pkill`, Ctrl-C or a logout quit like the menu's Quit, so the Now Playing helper stops with us.
+    private func quitOnSignals() {
+        for sig in [SIGTERM, SIGINT, SIGHUP] {
+            signal(sig, SIG_IGN)
+            let source = DispatchSource.makeSignalSource(signal: sig, queue: .main)
+            source.setEventHandler { NSApp.terminate(nil) }
+            source.resume()
+            signalSources.append(source)
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
