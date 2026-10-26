@@ -8,7 +8,7 @@ import { xSource, rssSource, RateLimited } from '../src/sources.js';
 import { playBark, notify, openUrl } from '../src/bark.js';
 import { showDog, log, barking, SLEEPING, WATCHING } from '../src/dog.js';
 import { detectLang, getMessages } from '../src/i18n.js';
-import { showIsland, prepareIsland, islandSupported, writeAlert, isletRunning } from '../src/island.js';
+import { ensureWidget, launchWidget, widgetRunning, widgetSupported, installApp, writeAlert } from '../src/widget.js';
 
 const { values: opt } = parseArgs({
   options: {
@@ -20,7 +20,8 @@ const { values: opt } = parseArgs({
     barks: { type: 'string', default: '1' },
     lang: { type: 'string' },
     open: { type: 'boolean', default: false },
-    'no-island': { type: 'boolean', default: false },
+    'no-widget': { type: 'boolean', default: false },
+    'install-app': { type: 'boolean', default: false },
     'bark-old': { type: 'boolean', default: false },
     once: { type: 'boolean', default: false },
     test: { type: 'boolean', default: false },
@@ -37,13 +38,32 @@ if (opt.help) {
 }
 
 const barks = Math.max(1, Number(opt.barks) || 1);
-const useIsland = islandSupported() && !opt['no-island'];
+const useWidget = widgetSupported() && !opt['no-widget'];
 
-function island() {
-  return prepareIsland({ onBuild: () => log(t.islandBuilding) }).then((bin) => {
-    if (!bin) log(t.islandUnavailable);
-    return bin;
-  });
+// Puts the notch widget (usage, Now Playing, the dog) on screen, building it on first run.
+async function startWidget() {
+  if (!useWidget || widgetRunning()) return;
+  const { app, error } = await ensureWidget({ onBuild: () => log(t.widgetBuilding) });
+  if (error) {
+    log(`${t.widgetFailed}\n${error}`);
+    return;
+  }
+  launchWidget(app);
+  log(t.widgetUp);
+}
+
+if (opt['install-app']) {
+  if (!widgetSupported()) {
+    console.error(t.widgetMacOnly);
+    process.exit(1);
+  }
+  const { error } = await installApp({ onBuild: () => log(t.widgetBuilding) });
+  if (error) {
+    log(`${t.widgetFailed}\n${error}`);
+    process.exit(1);
+  }
+  log(t.appInstalled);
+  process.exit(0);
 }
 
 async function alert(post) {
@@ -52,13 +72,16 @@ async function alert(post) {
   if (post.url) log(post.url);
   notify(t.notifyTitle, post.text.slice(0, 180));
   if (opt.open && post.url) openUrl(post.url);
-  const card = { title: t.islandTitle, body: post.text, url: post.url, woof: t.islandWoof, open: t.islandOpen };
-  writeAlert({ id: post.id ?? `test-${Date.now()}`, ...card });
-  // Islet barks in its own island; otherwise our own notch dog does.
-  if (useIsland && !isletRunning()) {
-    await island();
-    showIsland({ ...card, lang });
-  }
+  // The widget picks this up and barks in the notch until it's read.
+  writeAlert({
+    id: post.id ?? `test-${Date.now()}`,
+    title: t.alertTitle,
+    body: post.text,
+    url: post.url,
+    woof: t.alertWoof,
+    open: t.alertOpen,
+  });
+  await startWidget(); // in case it was quit
   await playBark(barks, opt.sound);
 }
 
@@ -67,7 +90,7 @@ if (opt.test) {
   process.exit(0);
 }
 
-const statePath = join(homedir(), '.tibodog', `${opt.user}.json`);
+const statePath = join(process.env.TIBODOG_HOME ?? join(homedir(), '.tibodog'), `${opt.user}.json`);
 const seen = new Set((() => {
   try {
     return JSON.parse(readFileSync(statePath, 'utf8')).seen ?? [];
@@ -81,6 +104,8 @@ function save() {
   mkdirSync(dirname(statePath), { recursive: true });
   writeFileSync(statePath, JSON.stringify({ seen: [...seen].slice(-500) }));
 }
+
+await startWidget();
 
 let source;
 try {
@@ -114,7 +139,6 @@ async function tick() {
 }
 
 showDog(WATCHING, t.watching(opt.user));
-if (useIsland) island(); // build ahead of time so the first reset shows up instantly
 log(t.source(source.name, intervalMs / 1000));
 
 while (true) {

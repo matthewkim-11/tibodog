@@ -12,11 +12,14 @@ const messages = {
     rateLimited: (sec) => `rate limited 💤 napping ${sec}s`,
     noToken: 'X_BEARER_TOKEN is not set (or use --rss <url>)',
     seeHelp: 'run `tibodog --help` for setup.',
-    islandTitle: 'Tibo reset the limits!',
-    islandWoof: 'WOOF!',
-    islandOpen: 'Open on X',
-    islandBuilding: 'building the notch dog (first run only, ~10s)...',
-    islandUnavailable: 'notch dog unavailable: install Xcode Command Line Tools (xcode-select --install)',
+    alertTitle: 'Tibo reset the limits!',
+    alertWoof: 'WOOF!',
+    alertOpen: 'Open on X',
+    widgetBuilding: 'building the notch widget (first run only, under a minute)...',
+    widgetFailed: "couldn't start the notch widget. It needs Xcode Command Line Tools (xcode-select --install).",
+    widgetUp: 'notch widget is up: usage · music · the dog',
+    widgetMacOnly: 'the notch widget is macOS only.',
+    appInstalled: 'installed /Applications/TiboDog.app. Turn on "Launch at Login" in its menu to start it with your Mac.',
     help: `tibodog 🐕 — barks when Tibo (@thsottiaux) resets the limits
 
 Usage: tibodog [options]
@@ -33,7 +36,8 @@ Options:
   --sound <file.wav|synth>  your own dog, or 'synth' for the synthesized bark
   --lang <ko|en>            UI language (default: from your system locale)
   --open                    open the post in the browser when barking
-  --no-island               don't show the barking dog in the notch (macOS)
+  --no-widget               don't start the notch widget (macOS)
+  --install-app             install the widget as /Applications/TiboDog.app and exit (optional)
   --bark-old                also bark at reset posts already in the feed on startup
   --once                    check once and exit (for cron)
   --test                    just bark, right now
@@ -50,11 +54,14 @@ Options:
     rateLimited: (sec) => `요청 한도 초과 💤 ${sec}초 낮잠`,
     noToken: 'X_BEARER_TOKEN이 설정되지 않았어요 (또는 --rss <url> 사용)',
     seeHelp: '설정 방법은 `tibodog --help` 참고.',
-    islandTitle: '티보가 리셋했어요!',
-    islandWoof: '멍!',
-    islandOpen: 'X에서 보기',
-    islandBuilding: '노치 강아지 준비 중 (처음 한 번만, 10초쯤)...',
-    islandUnavailable: '노치 강아지를 띄울 수 없어요. Xcode Command Line Tools를 설치해 주세요 (xcode-select --install)',
+    alertTitle: '티보가 리셋했어요!',
+    alertWoof: '멍!',
+    alertOpen: 'X에서 보기',
+    widgetBuilding: '노치 위젯 빌드 중 (처음 한 번만, 1분 안 걸려요)...',
+    widgetFailed: '노치 위젯을 띄우지 못했어요. Xcode Command Line Tools가 필요해요 (xcode-select --install).',
+    widgetUp: '노치 위젯 실행 중: 사용량 · 음악 · 개',
+    widgetMacOnly: '노치 위젯은 macOS에서만 돼요.',
+    appInstalled: '/Applications/TiboDog.app에 설치했어요. 메뉴에서 "Launch at Login"을 켜면 맥을 켤 때 같이 떠요.',
     help: `tibodog 🐕
 티보(@thsottiaux)가 리셋하면 짖는 개
 
@@ -72,7 +79,8 @@ Options:
   --sound <file.wav|synth>  내 개 소리 파일, 또는 synth로 합성 소리 사용
   --lang <ko|en>            표시 언어 (기본: 시스템 언어)
   --open                    짖을 때 브라우저로 글 열기
-  --no-island               노치에 짖는 강아지 띄우지 않기 (macOS)
+  --no-widget               노치 위젯 띄우지 않기 (macOS)
+  --install-app             위젯을 /Applications/TiboDog.app으로 설치하고 끝내기 (선택)
   --bark-old                시작할 때 피드에 이미 있는 리셋 글에도 짖기
   --once                    한 번만 확인하고 종료 (cron용)
   --test                    지금 바로 짖기

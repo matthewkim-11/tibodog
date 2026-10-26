@@ -12,22 +12,27 @@
 ```
 
 Tibo ([@thsottiaux](https://x.com/thsottiaux)) posts on X whenever the Codex usage limits get reset.
-tibodog watches his feed, and when a reset post shows up it:
+Run `npx tibodog` and:
 
-- 🔊 **barks** with a real dog recording (or a synthesized bark with `--sound synth`)
-- 🐶 **barks in your notch** on macOS until you look (see below)
-- 🔔 pops a desktop notification (macOS / Linux)
-- 🌐 opens the post if you pass `--open`
+- 🏝️ a **notch widget** comes up on macOS: your Claude Code or Codex usage on both sides of the notch,
+  Now Playing next to it, and the dog
+- 👀 it **watches Tibo's feed**, and when a reset post shows up
+- 🐶 the dog **barks in the notch until you read it**, 🔊 barks out loud (a real recording), and 🔔 pops a
+  notification
 
-Zero dependencies. Node 18+. macOS, Linux, Windows.
+명령어 하나로 노치 위젯(사용량 · 음악 · 개)이 뜨고, 티보의 X를 감시하다가 리셋 글이 오면 개가 짖어요.
+
+No npm dependencies. Node 18+. The widget needs macOS 14+ and Xcode Command Line Tools to build on first
+run; on Linux and Windows tibodog still watches and barks in the terminal.
 
 ## 빠른 시작 / Quick start
 
 ```bash
-npx tibodog --test        # 지금 바로 한번 짖어보기 / bark once right now
+npx tibodog --test        # 위젯 띄우고 바로 한번 짖어보기 / bring up the widget and bark once
 ```
 
-Then pick a way to read X:
+The first run builds the widget into `~/.tibodog` (under a minute). After that it starts instantly and keeps
+running even when you close the terminal. Then pick a way to read X:
 
 ### A) 공식 X API / Official X API
 
@@ -60,7 +65,8 @@ npx tibodog --rss "https://your-rsshub.example.com/twitter/user/thsottiaux"
 | `--sound <file.wav\|synth>` | real recording | bring your own dog, or `synth` for the synthesized bark |
 | `--lang <ko\|en>` | system locale | 표시 언어 / UI language |
 | `--open` | off | open the post in the browser |
-| `--no-island` | | 노치 강아지 끄기 / no notch dog (macOS) |
+| `--no-widget` | | 노치 위젯 끄기 / don't start the notch widget |
+| `--install-app` | | 위젯을 앱으로 설치 / install the widget as an app (below) |
 | `--bark-old` | off | also bark at reset posts already in the feed on startup |
 | `--once` | off | check once and exit (for cron) |
 | `--test` | | just bark |
@@ -79,32 +85,55 @@ npx tibodog --lang en     # WOOF! WOOF! RESET! RESET!
 Order: `--lang` → `TIBODOG_LANG` → `LC_ALL` / `LC_MESSAGES` / `LANG` → system locale → `en`.
 To add a language, add an entry to [`src/i18n.js`](src/i18n.js).
 
-## 노치 강아지 / The notch dog (macOS)
-
-리셋이 오면 노치(다이나믹 아일랜드 자리) 양옆에 강아지가 나와서 계속 짖어요.
-마우스를 올리면 펼쳐져서 티보의 글이 보이고, 다 읽고 마우스를 떼면 노치 안으로 쏙 들어가요.
-살짝 스치기만 하면 확인한 걸로 치지 않고 계속 짖어요.
-
-When a reset lands, a dog appears on both sides of the notch and keeps barking. Hover to read the post,
-move away and it tucks back into the notch. A quick brush doesn't count as read. It stays even if you
-quit tibodog, so a reset you missed while away is still waiting for you.
+## 노치 위젯 / The notch widget (macOS)
 
 ```
- ┌──────────┬────────┬──────────┐
- │ 🐕 ))    │ notch  │    멍!   │   ← keeps barking
- └──────────┴────────┴──────────┘
-              hover ↓
- ┌──────────────────────────────────────────┐
- │ 🐕   티보가 리셋했어요!            지금 │
- │      We just reset Codex rate limits...  │
- │      X에서 보기 ↗                        │
- └──────────────────────────────────────────┘
+ 평소 / usually
+ ┌───────────────────┬───────┬───────────────────┐
+ │ ◔ 5H 26%  ♪       │ notch │       ▮▮▮  ◔ 7D 28% │
+ └───────────────────┴───────┴───────────────────┘
+ 리셋이 오면 / when a reset lands
+ ┌───────────────────┬───────┬───────────────────┐
+ │ ◔ 5H 26%  🐕)) ♪  │ notch │   ▮▮▮  멍!  ◔ 7D 28% │   ← keeps barking
+ └───────────────────┴───────┴───────────────────┘
 ```
 
-- Native SwiftUI helper in [`src/island/TiboIsland.swift`](src/island/TiboIsland.swift), compiled on first run
-  into `~/.tibodog/bin` (needs Xcode Command Line Tools: `xcode-select --install`).
-- Works on Macs without a notch too: it shows as a black pill at the top center.
-- Sits above other notch apps (NotchNook, Islet, ...) so a reset never hides behind them.
+- **Usage**: the 5-hour and weekly windows of Claude Code (the same numbers as `/usage`) or Codex, with
+  reset timers. Hover the notch for details; switch between Claude and Codex there or in the menu.
+- **Now Playing**: album art and dancing bars while music plays; hover for the track and controls. Works with
+  anything that publishes to macOS Now Playing (Spotify, Apple Music, YouTube Music in Chrome, Safari...).
+- **The dog**: on a reset, it barks beside the notch until you read it. Hover to see Tibo's post and a link;
+  keep it open for a second and the dog goes back to sleep. A quick brush doesn't count. It survives restarts,
+  so a reset you missed while away is still waiting for you.
+- Right-click the island (or use the menu bar icon) for settings: provider, Now Playing, menu bar text,
+  launch at login.
+
+리셋이 오면 노치 옆에서 개가 계속 짖어요. 마우스를 올리면 티보의 글이 보이고, 1초쯤 읽고 떼면 개가 들어가요.
+살짝 스치기만 하면 계속 짖어요. 사용량과 음악은 늘 보여요.
+
+### 앱으로 설치 (선택) / Install as an app (optional)
+
+`npx tibodog` is all you need. If you want the widget to start with your Mac even when tibodog isn't
+running, install it as an app and turn on **Launch at Login** in its menu:
+
+```bash
+npx tibodog --install-app     # → /Applications/TiboDog.app
+```
+
+The X watching still runs in `tibodog`; the app shows usage and music on its own and barks when tibodog
+reports a reset (they talk through `~/.tibodog/alert.json`).
+
+### Usage sources
+
+- **Claude Code**: reuses the Claude Code login already on your Mac (Keychain item `Claude Code-credentials`,
+  read through `/usr/bin/security`, falling back to `~/.claude/.credentials.json`) and calls
+  `api.anthropic.com/api/oauth/usage`. Refreshes an expired token the same way Claude Code does and writes it
+  back; turn that off in the menu. Usage limits are a subscription feature, so API-key logins show nothing.
+- **Codex**: starts the installed `codex app-server`, reads `account/rateLimits/read`, and closes it. Sign in
+  to Codex with ChatGPT first. Set `TIBODOG_CODEX_PATH` if it lives somewhere unusual.
+- **Now Playing** on macOS 15.4+ goes through the bundled
+  [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter) (BSD-3, in `app/Vendor/`). If Apple
+  breaks it, music quietly disappears and the rest keeps working.
 
 ## 어떻게 판단하나 / How it decides
 
@@ -118,14 +147,26 @@ Seen IDs are stored in `~/.tibodog/<user>.json`.
 ## 개발 / Development
 
 ```bash
-npm test
+npm test                    # the watcher
+cd app && swift test        # the widget
+cd app && make run          # build app/build/TiboDog.app and open it
 ```
+
+Widget flags for development: `TIBODOG_DEBUG=1` (logs to stderr), `TIBODOG_MOCK=1` (sample data, no Keychain
+or network), `TIBODOG_EXPANDED=1` (start expanded), `TIBODOG_SNAPSHOT=/path.png` (render and quit;
+`make shots` in `app/`).
+
+## Privacy
+
+tibodog sends no conversations or files anywhere. It talks to X (or the RSS feed you give it), Anthropic for
+Claude usage and token refresh, and OpenAI through the installed Codex app server. No analytics.
 
 ## 소리 출처 / Sound credits
 
 The bundled bark is ["Barking of a dog"](https://commons.wikimedia.org/wiki/File:Barking_of_a_dog.ogg)
 by Amada44 on Wikimedia Commons, licensed [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).
 The audio file keeps that license. The code is MIT. Details in [`sounds/CREDITS.md`](sounds/CREDITS.md).
+The widget grew out of [Islet](https://github.com/aiasapkr-beep/islet), the same author's notch usage app.
 
 ## Disclaimer
 

@@ -1,15 +1,27 @@
 {
   "name": "tibodog",
   "version": "0.1.0",
-  "description": "A dog that barks when Tibo (@thsottiaux) resets the Codex limits on X",
+  "description": "A notch widget (Claude Code/Codex usage, Now Playing) with a dog that barks when Tibo (@thsottiaux) resets the Codex limits on X",
   "type": "module",
   "bin": { "tibodog": "bin/tibodog.js" },
-  "files": ["bin", "src", "sounds", "README.md", "LICENSE"],
+  "files": [
+    "bin",
+    "src",
+    "sounds",
+    "app/Package.swift",
+    "app/Sources",
+    "app/Resources",
+    "app/Scripts",
+    "app/Vendor",
+    "!app/Vendor/mediaremote-adapter/build",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "start": "node bin/tibodog.js",
     "test": "node --test test/*.test.js"
   },
   "engines": { "node": ">=18" },
-  "keywords": ["codex", "rate-limit", "reset", "dog", "x", "twitter"],
+  "keywords": ["codex", "claude-code", "usage", "notch", "macos", "rate-limit", "reset", "dog", "x", "twitter"],
   "license": "MIT"
 }
