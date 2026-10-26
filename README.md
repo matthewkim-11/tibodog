@@ -1,5 +1,7 @@
 # 🐕 tibodog
 
+[![npm](https://img.shields.io/npm/v/tibodog)](https://www.npmjs.com/package/tibodog)
+
 > 티보가 리셋하면 짖는 개.
 > A dog that barks when Tibo resets the limits.
 
@@ -32,9 +34,6 @@ run; on Linux and Windows tibodog still watches and barks in the terminal.
 ```bash
 npx tibodog --test        # 위젯 띄우고 바로 한번 짖어보기 / bring up the widget and bark once
 ```
-
-> 아직 npm에 올리기 전이에요. 그동안은 `npx tibodog` 대신 `npx github:matthewkim-11/tibodog`을 쓰세요.
-> Not on npm yet: use `npx github:matthewkim-11/tibodog` in place of `npx tibodog` for now.
 
 The first run builds the widget into `~/.tibodog` (under a minute). After that it starts instantly and keeps
 running even when you close the terminal. Then pick a way to read X:
