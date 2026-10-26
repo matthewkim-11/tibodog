@@ -56,7 +56,8 @@ final class ResetTracker: ObservableObject {
 
     /// Reads Codex now (off the main thread) and records what it says.
     func check() {
-        guard !checking else { return }
+        // TIBODOG_MOCK=1 reads the history from TIBODOG_HOME and never asks Codex.
+        guard !checking, !UsageStore.mock else { return }
         checking = true
         Task.detached(priority: .utility) {
             let result = try? CodexUsageAPI.fetch()

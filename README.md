@@ -3,6 +3,8 @@
 > 티보가 리셋하면 짖는 개.
 > A dog that barks when Tibo resets the limits.
 
+![tibodog in the notch: usage on both sides, Now Playing, and the dog barking](docs/mockup-collapsed.jpg)
+
 ```
       / \__            _______________
      (    O\___       |  WOOF! WOOF!  |
@@ -90,16 +92,7 @@ To add a language, add an entry to [`src/i18n.js`](src/i18n.js).
 
 ## 노치 위젯 / The notch widget (macOS)
 
-```
- 평소 / usually
- ┌───────────────────┬───────┬───────────────────┐
- │ ◔ 5H 26%  ♪       │ notch │       ▮▮▮  ◔ 7D 28% │
- └───────────────────┴───────┴───────────────────┘
- 리셋이 오면 / when a reset lands
- ┌───────────────────┬───────┬───────────────────┐
- │ ◔ 5H 26%  🐕)) ♪  │ notch │   ▮▮▮  멍!  ◔ 7D 28% │   ← keeps barking
- └───────────────────┴───────┴───────────────────┘
-```
+![The widget opened: Tibo's post with a check that the reset reached the account, Codex usage, reset credits, Now Playing](docs/mockup-expanded.jpg)
 
 - **Usage**: the 5-hour and weekly windows of Claude Code (the same numbers as `/usage`) or Codex, with
   reset timers. Hover the notch for details; switch between Claude and Codex there or in the menu.
@@ -176,6 +169,8 @@ The bundled bark is ["Barking of a dog"](https://commons.wikimedia.org/wiki/File
 by Amada44 on Wikimedia Commons, licensed [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).
 The audio file keeps that license. The code is MIT ([`LICENSE`](LICENSE); the widget in `app/` keeps Islet's notice in [`app/LICENSE`](app/LICENSE)). Details in [`sounds/CREDITS.md`](sounds/CREDITS.md).
 The widget grew out of [Islet](https://github.com/aiasapkr-beep/islet), the same author's notch usage app.
+
+The mockups in `docs/` use macOS Sonoma's default wallpaper, © Apple Inc.
 
 ## Disclaimer
 
