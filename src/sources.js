@@ -128,7 +128,8 @@ const entities = (s) =>
 const decode = (s) => clean(stripTags(entities(stripTags(unwrapCdata(s))))).replace(/\s+/g, ' ').trim();
 
 // The first <name ...>...</name> (or a self-closing <name .../>) in xml.
-function element(xml, name) {
+function element(xml, tagName) {
+  const name = tagName.toLowerCase(); // pubDate, ...
   const lower = xml.toLowerCase();
   let i = 0;
   while ((i = lower.indexOf(`<${name}`, i)) !== -1) {

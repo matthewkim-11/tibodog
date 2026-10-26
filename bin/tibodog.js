@@ -154,7 +154,8 @@ try {
 }
 
 // Between 15 seconds and a day: anything else would hammer the feed or overflow setTimeout.
-const seconds = Number(opt.interval) || (opt.rss ? 60 : 300);
+// RSS mirrors are mostly volunteer-run and refresh every few minutes at best: 5 minutes is plenty.
+const seconds = Number(opt.interval) || 300;
 const intervalMs = Math.min(Math.max(seconds, 15), 86_400) * 1000;
 let primed = !firstRun || opt['bark-old'];
 

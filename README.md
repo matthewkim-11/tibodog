@@ -54,8 +54,13 @@ Any RSS/Atom feed of the account works: a Nitter instance, self-hosted [RSSHub](
 (`/twitter/user/thsottiaux`), rss.app, and so on.
 
 ```bash
-npx tibodog --rss "https://your-rsshub.example.com/twitter/user/thsottiaux"
+npx tibodog --rss "https://nitter.kareem.one/thsottiaux/rss"
 ```
+
+That Nitter instance served Tibo's feed when this was written (Oct 2026); most public ones are blocked or
+gone (nitter.net, xcancel.com, rsshub.app all refused). Mirrors come and go, so if it stops working, find
+another or self-host RSSHub. They're run by volunteers: keep the default 5-minute interval.
+tibodog only ever opens the post on x.com, never the mirror's own links.
 
 ## 옵션 / Options
 
@@ -63,7 +68,7 @@ npx tibodog --rss "https://your-rsshub.example.com/twitter/user/thsottiaux"
 |---|---|---|
 | `--user <handle>` | `thsottiaux` | 감시할 계정 / account to watch |
 | `--rss <url>` | | use an RSS feed instead of the X API |
-| `--interval <sec>` | 60 (RSS) / 300 (X) | poll interval |
+| `--interval <sec>` | 300 | poll interval (min 15) |
 | `--keyword <text>` | | extra trigger phrase, repeatable |
 | `--barks <n>` | 1 | 짖는 소리 반복 횟수 / times to play the bark |
 | `--sound <file.wav\|synth>` | real recording | bring your own dog, or `synth` for the synthesized bark |

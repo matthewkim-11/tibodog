@@ -14,6 +14,9 @@ test('barks at reset announcements', () => {
     'Day 21/ Wonder what happens the remaining seven days. But today is a reset.',
     'Day 17/ Bet you thought we forgot, but no, it’s reset day today.',
     "Day 15/ Nevermind, we're still cooking... and reset. Enjoy.",
+    'Day 18/ Decisions API is GA, OpenResponses joined the Linux Foundation. But yes… that’s a reset!',
+    'But yes, that’s a reset!',
+    'Day 20/ Rest and reset',
     'Back at the laptop. The usage limits have been reset for all paid users of Codex and ChatGPT Work.',
   ]) assert.ok(isResetPost(t), t);
 });
@@ -26,6 +29,8 @@ test('stays quiet otherwise', () => {
     'Lands tomorrow before 10am PST.',
     "Fully included in the Pro plan, doesn't draw on your weekly usage.",
     'When is the next reset?',
+    'R to @thsottiaux: By midnight PST',
+    'Saturday is for fixing bugs while sipping coffee.',
     'Please reset your password via the link',
   ]) assert.ok(!isResetPost(t), t);
 });

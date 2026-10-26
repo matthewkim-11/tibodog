@@ -30,7 +30,7 @@ Sources (pick one):
 
 Options:
   --user <handle>           account to watch (default: thsottiaux)
-  --interval <sec>          poll interval (default: 60 for RSS, 300 for X API)
+  --interval <sec>          poll interval (default: 300)
   --keyword <text>          extra trigger phrase, repeatable
   --barks <n>               times to play the bark per alert (default: 1)
   --sound <file.wav|synth>  your own dog, or 'synth' for the synthesized bark
@@ -73,7 +73,7 @@ Options:
 
 옵션:
   --user <handle>           감시할 계정 (기본: thsottiaux)
-  --interval <초>           확인 주기 (기본: RSS 60초, X API 300초)
+  --interval <초>           확인 주기 (기본: 300초)
   --keyword <텍스트>        추가 트리거 문구, 여러 번 지정 가능
   --barks <n>               알림당 짖는 소리 반복 횟수 (기본: 1)
   --sound <file.wav|synth>  내 개 소리 파일, 또는 synth로 합성 소리 사용
