@@ -77,6 +77,16 @@ final class ResetTracker: ObservableObject {
         guard !redeeming else { return }
         redeeming = true
         lastOutcome = nil
+        if UsageStore.mock {
+            // Demos and screenshots: look like Codex said "reset", never spend a real credit.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+                self.redeeming = false
+                self.lastOutcome = "reset"
+                self.credits = max(0, (self.credits ?? 1) - 1)
+                UsageStore.shared.mockReset()
+            }
+            return
+        }
         let key = UUID().uuidString
         Task.detached(priority: .userInitiated) {
             var outcome = (try? CodexUsageAPI.consumeResetCredit(idempotencyKey: key)) ?? "error"

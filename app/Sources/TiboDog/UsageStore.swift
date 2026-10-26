@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Combine
 import ServiceManagement
 
@@ -178,6 +179,18 @@ final class UsageStore: ObservableObject {
         catch { Log.error("token saved in memory but not written back: \(error.localizedDescription)") }
         Log.info("token refreshed and saved to \(source)")
         return fresh
+    }
+
+    /// TIBODOG_MOCK=1: what spending a reset credit looks like, for demos (both windows start over).
+    func mockReset() {
+        guard Self.mock || Self.mockUsageOnly else { return }
+        withAnimation(.easeOut(duration: 0.6)) {
+            usage?.fiveHour?.utilization = 0
+            usage?.fiveHour?.resetsAt = Date().addingTimeInterval(5 * 3600)
+            usage?.sevenDay?.utilization = 0
+            usage?.sevenDay?.resetsAt = Date().addingTimeInterval(7 * 86400)
+        }
+        lastUpdated = Date()
     }
 
     /// Short text for the menu bar item, e.g. "42% · 18%".
