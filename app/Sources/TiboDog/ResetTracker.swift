@@ -136,11 +136,15 @@ final class ResetTracker: ObservableObject {
 
     /// Did the reset announced at `postedAt` reach this account?
     func verdict(after postedAt: Date) -> ResetVerdict {
-        guard let latest = history.last else { return reachable ? .pending : .unknown }
+        guard !history.isEmpty else { return reachable ? .pending : .unknown }
         // A global reset starts the weekly window over (Codex's windows start at the reset, or at the
-        // first use after it). Allow a little slack for clocks and propagation.
-        if let start = latest.weeklyStart, start >= postedAt.addingTimeInterval(-30 * 60),
-           !(spentAt.map { abs($0.timeIntervalSince(start)) < 10 * 60 } ?? false) {
+        // first use after it). Allow a little slack for clocks and propagation. The first restart after
+        // the post counts, not just the latest: spending a credit later doesn't undo a reset that landed.
+        let restarts = history.compactMap(\.weeklyStart).filter { start in
+            start >= postedAt.addingTimeInterval(-30 * 60)
+                && !(spentAt.map { abs($0.timeIntervalSince(start)) < 10 * 60 } ?? false)
+        }
+        if let start = restarts.min() {
             // With a record from before the post, a reset is told apart from the old window running out.
             if let before = history.last(where: { $0.at < postedAt }), let oldStart = before.weeklyStart {
                 let oldEnd = oldStart.addingTimeInterval(Double(before.weeklyMinutes ?? 10_080) * 60)
