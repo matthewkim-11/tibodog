@@ -1,6 +1,6 @@
 {
   "name": "tibodog",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A notch widget (Claude Code/Codex usage, Now Playing) with a dog that barks when Tibo (@thsottiaux) resets the Codex limits on X",
   "type": "module",
   "bin": {
