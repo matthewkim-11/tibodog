@@ -6,6 +6,7 @@ struct NotchView: View {
     @EnvironmentObject var store: UsageStore
     @ObservedObject private var music = NowPlayingMonitor.shared
     @ObservedObject private var dog = DogMonitor.shared
+    @ObservedObject private var resets = ResetTracker.shared
     let geometry: NotchGeometry
 
     @State private var hovering = ProcessInfo.processInfo.environment["TIBODOG_EXPANDED"] == "1"
@@ -116,6 +117,7 @@ struct NotchView: View {
                 UsageRow(title: store.secondaryTitle, window: u.sevenDay)
                 if let o = u.sevenDayOpus { UsageRow(title: "Weekly · Opus", window: o) }
                 if let s = u.sevenDaySonnet { UsageRow(title: "Weekly · Sonnet", window: s) }
+                if store.provider == .codex, resets.credits != nil { ResetCreditRow(tracker: resets, usage: u) }
             } else if store.isLoading {
                 Text("Loading usage…").font(.system(size: 12)).foregroundStyle(.white.opacity(0.7))
             }
@@ -460,6 +462,7 @@ struct DogSection: View {
                     .foregroundStyle(.white.opacity(0.7))
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
+                if !alert.isCredit { ResetCheck(alert: alert, tracker: ResetTracker.shared) }
                 if alert.url != nil {
                     Button { dog.openPost() } label: {
                         Text(alert.open + " ↗").font(.system(size: 11, weight: .semibold)).foregroundStyle(.yellow)
@@ -468,5 +471,101 @@ struct DogSection: View {
                 }
             }
         }
+    }
+}
+
+
+// MARK: - Reset credits
+
+/// Did Tibo's reset reach this account? Checked against the Codex history the tracker keeps.
+struct ResetCheck: View {
+    let alert: DogAlert
+    @ObservedObject var tracker: ResetTracker
+
+    var body: some View {
+        let (text, color): (String, Color) = {
+            switch tracker.verdict(after: alert.postedAt ?? alert.at) {
+            case .windowRestarted(let start):
+                return (L("✅ 우리 계정에도 들어왔어요 · 주간 사용량이 \(clockText(start))에 새로 시작",
+                          "✅ It reached your account · weekly usage started over at \(clockText(start))"), usageColor(0))
+            case .creditAdded(let from, let to):
+                return (L("🎟️ 리셋권으로 들어왔어요 · \(from)개 → \(to)개", "🎟️ It came as a reset credit · \(from) → \(to)"), usageColor(0))
+            case .pending:
+                return (L("⏳ 우리 계정엔 아직이에요 · 몇 분마다 확인해요", "⏳ Not on your account yet · checking every few minutes"), .white.opacity(0.5))
+            case .unknown:
+                return (L("Codex에 로그인돼 있지 않아 확인할 수 없어요", "Can't check: Codex isn't signed in"), .white.opacity(0.5))
+            }
+        }()
+        Text(text).font(.system(size: 10.5, weight: .medium)).foregroundStyle(color)
+    }
+}
+
+/// The Codex tab's reset credits, and a button to spend one (after a second, explicit confirm).
+struct ResetCreditRow: View {
+    @ObservedObject var tracker: ResetTracker
+    let usage: Usage
+    @State private var confirming = false
+
+    private var count: Int { tracker.credits ?? 0 }
+    /// Both windows barely used: a credit would be wasted now.
+    private var barelyUsed: Bool { max(usage.fiveHour?.utilization ?? 0, usage.sevenDay?.utilization ?? 0) < 10 }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 6) {
+                Text("🎟️").font(.system(size: 12))
+                Text(L("리셋권 \(count)개", count == 1 ? "1 reset credit" : "\(count) reset credits"))
+                    .font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.85))
+                Spacer()
+                if tracker.redeeming {
+                    ProgressView().controlSize(.small)
+                } else if confirming {
+                    pill(L("취소", "Cancel"), primary: false) { confirming = false }
+                    pill(L("리셋", "Reset"), primary: true) { confirming = false; tracker.useCredit() }
+                } else {
+                    Button { confirming = true } label: {
+                        Text(L("리셋하러 가기 →", "Use a reset →"))
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(count > 0 ? Color.yellow : .white.opacity(0.3))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(count == 0)
+                }
+            }
+            if confirming {
+                Text(L("리셋권 1개를 써서 지금 Codex 사용량(5시간·주간)을 처음으로 되돌려요. 쓴 리셋권은 돌아오지 않아요.",
+                       "Spends 1 credit to set your Codex usage (5-hour and weekly) back to zero. It can't be undone."))
+                    .font(.system(size: 10)).foregroundStyle(Color(red: 1, green: 0.62, blue: 0.04))
+                    .fixedSize(horizontal: false, vertical: true)
+                if barelyUsed {
+                    Text(L("지금은 사용량이 거의 없어서 아껴 두는 게 좋아요.", "You've barely used anything; better to save it."))
+                        .font(.system(size: 10)).foregroundStyle(.white.opacity(0.55))
+                }
+            } else if let o = tracker.lastOutcome {
+                Text(outcomeText(o)).font(.system(size: 10)).foregroundStyle(.white.opacity(0.6))
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: confirming)
+    }
+
+    private func outcomeText(_ o: String) -> String {
+        switch o {
+        case "reset": return L("✅ 리셋했어요. 사용량이 처음으로 돌아갔어요.", "✅ Reset. Your usage is back to zero.")
+        case "nothingToReset": return L("Codex가 지금은 리셋할 사용량이 없다고 해요.", "Codex says there's nothing to reset right now.")
+        case "noCredit": return L("쓸 수 있는 리셋권이 없어요.", "No reset credits left.")
+        case "alreadyRedeemed": return L("이미 처리된 리셋이에요.", "That reset already went through.")
+        default: return L("Codex에 연결하지 못했어요. 잠시 뒤 다시 해 보세요.", "Couldn't reach Codex. Try again in a moment.")
+        }
+    }
+
+    private func pill(_ title: String, primary: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(primary ? .black : .white)
+                .padding(.horizontal, 10).padding(.vertical, 3)
+                .background(Capsule().fill(primary ? Color.yellow : Color.white.opacity(0.14)))
+        }
+        .buttonStyle(.plain)
     }
 }

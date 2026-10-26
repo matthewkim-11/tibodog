@@ -41,14 +41,17 @@ const barks = Math.max(1, Number(opt.barks) || 1);
 const useWidget = widgetSupported() && !opt['no-widget'];
 
 // Puts the notch widget (usage, Now Playing, the dog) on screen, building it on first run.
+let widgetLaunchedAt = 0;
 async function startWidget() {
-  if (!useWidget || widgetRunning()) return;
+  // Just opened: it can take a moment to show up as running.
+  if (!useWidget || widgetRunning() || Date.now() - widgetLaunchedAt < 30_000) return;
   const { app, error } = await ensureWidget({ onBuild: () => log(t.widgetBuilding) });
   if (error) {
     log(`${t.widgetFailed}\n${error}`);
     return;
   }
   launchWidget(app);
+  widgetLaunchedAt = Date.now();
   log(t.widgetUp);
 }
 
@@ -80,6 +83,7 @@ async function alert(post) {
     url: post.url,
     woof: t.alertWoof,
     open: t.alertOpen,
+    postedAt: post.createdAt,
   });
   await startWidget(); // in case it was quit
   await playBark(barks, opt.sound);

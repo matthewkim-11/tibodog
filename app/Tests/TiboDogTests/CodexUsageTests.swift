@@ -17,6 +17,15 @@ final class CodexUsageTests: XCTestCase {
         XCTAssertEqual(result.usage.sevenDay?.durationLabel, "7D")
         XCTAssertEqual(result.plan, "plus")
         XCTAssertNil(result.usage.sevenDayOpus)
+        XCTAssertNil(result.resetCredits)
+    }
+
+    func testDecodesResetCredits() throws {
+        let result = try CodexUsageAPI.decode([
+            "rateLimits": ["primary": ["usedPercent": 1, "windowDurationMins": 300]],
+            "rateLimitResetCredits": ["availableCount": 2]
+        ])
+        XCTAssertEqual(result.resetCredits, 2)
     }
 
     func testLegacySingleWindowAndNonStandardDuration() throws {

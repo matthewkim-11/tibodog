@@ -105,6 +105,12 @@ To add a language, add an entry to [`src/i18n.js`](src/i18n.js).
 - **The dog**: on a reset, it barks beside the notch until you read it. Hover to see Tibo's post and a link;
   keep it open for a second and the dog goes back to sleep. A quick brush doesn't count. It survives restarts,
   so a reset you missed while away is still waiting for you.
+- **Did the reset reach you?** The dog's card checks it against your Codex account: ✅ when your weekly
+  window started over after Tibo's post, 🎟️ when it came as a reset credit, ⏳ while it hasn't yet. Codex is
+  read every 10 minutes (even with Claude shown) and the changes are kept in `~/.tibodog/codex-history.json`.
+  A new reset credit makes the dog bark too.
+- **Reset credits** (Codex tab): how many you have, and **Use a reset →** to spend one through Codex's own
+  `account/rateLimitResetCredit/consume`, after a confirm. It warns you when there's barely anything to reset.
 - Right-click the island (or use the menu bar icon) for settings: provider, Now Playing, menu bar text,
   launch at login.
 

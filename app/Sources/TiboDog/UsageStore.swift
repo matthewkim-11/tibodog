@@ -128,6 +128,7 @@ final class UsageStore: ObservableObject {
         do {
             if provider == .codex {
                 let result = try CodexUsageAPI.fetch()
+                publish { _ in ResetTracker.shared.record(usage: result.usage, credits: result.resetCredits) }
                 publish(for: provider) {
                     $0.usage = result.usage; $0.plan = result.plan; $0.sourceName = "Codex"
                     $0.lastUpdated = Date(); $0.backoffUntil = nil; $0.errorMessage = nil

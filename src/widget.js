@@ -105,8 +105,11 @@ export async function installApp({ onBuild } = {}) {
 
 // Leaves the reset for the widget, which barks in the notch until it's read. The widget marks it read
 // by writing the id to alert-seen.
-export function writeAlert({ id, title, body, url, woof, open }) {
+export function writeAlert({ id, title, body, url, woof, open, postedAt }) {
   mkdirSync(DIR, { recursive: true });
+  const posted = Date.parse(postedAt ?? '');
   const alert = { id: String(id), title, body, url: url || null, woof, open, at: Date.now() / 1000 };
+  // When Tibo posted it: the widget checks whether the reset reached the account after this.
+  if (Number.isFinite(posted)) alert.postedAt = posted / 1000;
   writeFileSync(join(DIR, 'alert.json'), JSON.stringify(alert));
 }

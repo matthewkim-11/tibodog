@@ -32,7 +32,21 @@ enum CodexUsageAPI {
     }
 
     // Called off the main actor. poll() bounds every read, including partial JSON lines.
-    static func fetch() throws -> (usage: Usage, plan: String?) {
+    static func fetch() throws -> (usage: Usage, plan: String?, resetCredits: Int?) {
+        try decode(call("account/rateLimits/read"))
+    }
+
+    /// Spends one of the account's reset credits on the current windows. Returns Codex's outcome:
+    /// "reset", "nothingToReset", "noCredit" or "alreadyRedeemed". Retrying with the same key never
+    /// spends a second credit.
+    static func consumeResetCredit(idempotencyKey: String) throws -> String {
+        let result = try call("account/rateLimitResetCredit/consume", params: ["idempotencyKey": idempotencyKey])
+        guard let outcome = result["outcome"] as? String else { throw Failure.protocolError }
+        return outcome
+    }
+
+    /// One request to a short-lived `codex app-server`: initialize, send it, return its result.
+    static func call(_ method: String, params: [String: Any]? = nil) throws -> [String: Any] {
         let process = Process()
         process.executableURL = try executable()
         process.arguments = ["app-server"]
@@ -58,7 +72,7 @@ enum CodexUsageAPI {
             data.append(10)
             try input.fileHandleForWriting.write(contentsOf: data)
         }
-        try send(["id": 1, "method": "initialize", "params": ["clientInfo": ["name": "islet", "version": "0.4.0"]]])
+        try send(["id": 1, "method": "initialize", "params": ["clientInfo": ["name": "tibodog", "version": "0.4.0"]]])
         let deadline = Date().addingTimeInterval(25)
         var buffer = Data()
         while Date() < deadline {
@@ -78,17 +92,19 @@ enum CodexUsageAPI {
                 guard message["error"] == nil else { throw Failure.unavailable }
                 if id == 1 {
                     try send(["method": "initialized"])
-                    try send(["id": 2, "method": "account/rateLimits/read"])
+                    var request: [String: Any] = ["id": 2, "method": method]
+                    if let params { request["params"] = params }
+                    try send(request)
                 } else if id == 2 {
                     guard let result = message["result"] as? [String: Any] else { throw Failure.protocolError }
-                    return try decode(result)
+                    return result
                 }
             }
         }
         throw Failure.timeout
     }
 
-    static func decode(_ result: [String: Any]) throws -> (usage: Usage, plan: String?) {
+    static func decode(_ result: [String: Any]) throws -> (usage: Usage, plan: String?, resetCredits: Int?) {
         let buckets = result["rateLimitsByLimitId"] as? [String: Any]
         // Never substitute an unrelated model bucket for the Codex quota.
         guard let limits = (buckets?["codex"] as? [String: Any]) ?? (result["rateLimits"] as? [String: Any]) else {
@@ -103,6 +119,7 @@ enum CodexUsageAPI {
         }
         let primary = window("primary"), secondary = window("secondary")
         guard primary != nil || secondary != nil else { throw Failure.unavailable }
-        return (Usage(fiveHour: primary, sevenDay: secondary), limits["planType"] as? String)
+        let credits = ((result["rateLimitResetCredits"] as? [String: Any])?["availableCount"] as? NSNumber)?.intValue
+        return (Usage(fiveHour: primary, sevenDay: secondary), limits["planType"] as? String, credits)
     }
 }
