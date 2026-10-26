@@ -1,6 +1,6 @@
 // Post sources. Each returns newest-first [{ id, text, url, createdAt }].
 
-const UA = 'tibodog/0.1 (+https://github.com/)';
+const UA = 'tibodog/0.1 (+https://github.com/matthewkim-11/tibodog)';
 
 export class RateLimited extends Error {
   constructor(retryAt) {

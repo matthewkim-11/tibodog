@@ -31,6 +31,9 @@ run; on Linux and Windows tibodog still watches and barks in the terminal.
 npx tibodog --test        # 위젯 띄우고 바로 한번 짖어보기 / bring up the widget and bark once
 ```
 
+> 아직 npm에 올리기 전이에요. 그동안은 `npx tibodog` 대신 `npx github:matthewkim-11/tibodog`을 쓰세요.
+> Not on npm yet: use `npx github:matthewkim-11/tibodog` in place of `npx tibodog` for now.
+
 The first run builds the widget into `~/.tibodog` (under a minute). After that it starts instantly and keeps
 running even when you close the terminal. Then pick a way to read X:
 
@@ -171,7 +174,7 @@ Claude usage and token refresh, and OpenAI through the installed Codex app serve
 
 The bundled bark is ["Barking of a dog"](https://commons.wikimedia.org/wiki/File:Barking_of_a_dog.ogg)
 by Amada44 on Wikimedia Commons, licensed [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).
-The audio file keeps that license. The code is MIT. Details in [`sounds/CREDITS.md`](sounds/CREDITS.md).
+The audio file keeps that license. The code is MIT ([`LICENSE`](LICENSE); the widget in `app/` keeps Islet's notice in [`app/LICENSE`](app/LICENSE)). Details in [`sounds/CREDITS.md`](sounds/CREDITS.md).
 The widget grew out of [Islet](https://github.com/aiasapkr-beep/islet), the same author's notch usage app.
 
 ## Disclaimer
