@@ -1,0 +1,15 @@
+{
+  "name": "tibodog",
+  "version": "0.1.0",
+  "description": "A dog that barks when Tibo (@thsottiaux) resets the Codex limits on X",
+  "type": "module",
+  "bin": { "tibodog": "bin/tibodog.js" },
+  "files": ["bin", "src", "sounds", "README.md", "LICENSE"],
+  "scripts": {
+    "start": "node bin/tibodog.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": { "node": ">=18" },
+  "keywords": ["codex", "rate-limit", "reset", "dog", "x", "twitter"],
+  "license": "MIT"
+}
