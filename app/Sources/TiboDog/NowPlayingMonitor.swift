@@ -85,7 +85,8 @@ final class NowPlayingMonitor: ObservableObject {
         open STDOUT, '>', '/dev/null'; open STDIN, '<', '/dev/null';
         while (1) {
             sleep 1;
-            exit 0 unless kill 0, $adapter;
+            # The adapter is our parent: once it's gone we're reparented, and its pid may be reused.
+            exit 0 if getppid() != $adapter;
             if (!kill 0, $app) { kill 'TERM', $adapter; exit 0 }
         }
     }
@@ -124,8 +125,8 @@ final class NowPlayingMonitor: ObservableObject {
             guard !data.isEmpty else { return }
             Task { @MainActor in self?.ingest(data) }
         }
-        proc.terminationHandler = { [weak self] _ in
-            Task { @MainActor in self?.processDied() }
+        proc.terminationHandler = { [weak self] dead in
+            Task { @MainActor in self?.processDied(dead) }
         }
         do {
             try proc.run()
@@ -149,7 +150,9 @@ final class NowPlayingMonitor: ObservableObject {
         lastArtworkB64 = nil
     }
 
-    private func processDied() {
+    private func processDied(_ dead: Process) {
+        // A late notice about an adapter we already replaced: not the one running now.
+        guard dead === process else { return }
         let wasRunning = process != nil
         tearDown()
         guard enabled, wasRunning else { return }

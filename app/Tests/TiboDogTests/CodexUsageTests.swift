@@ -64,3 +64,14 @@ final class CodexUsageTests: XCTestCase {
         XCTAssertTrue(result.usage.fiveHour != nil || result.usage.sevenDay != nil)
     }
 }
+
+final class DogLinkTests: XCTestCase {
+    func testOnlyPostsOnXOpen() {
+        XCTAssertTrue(isPostURL(URL(string: "https://x.com/thsottiaux/status/2114588174249071102")!))
+        XCTAssertTrue(isPostURL(URL(string: "https://twitter.com/a/status/123456")!))
+        for bad in ["file:///System/Applications/Calculator.app", "http://x.com/a/status/1", "vscode://x/status/1",
+                    "https://x.com.evil.com/a/status/1", "https://evil.com/x.com/status/1", "https://x.com/settings"] {
+            XCTAssertFalse(isPostURL(URL(string: bad)!), bad)
+        }
+    }
+}

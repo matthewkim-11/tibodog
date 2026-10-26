@@ -2,8 +2,11 @@ import Foundation
 
 /// Whether a reset Tibo announced actually reached this Codex account.
 enum ResetVerdict: Equatable {
-    /// The weekly window started over after the post.
+    /// The weekly window started over after the post, while the old one still had time left.
     case windowRestarted(Date)
+    /// It started over after the post, but there's no record from before it to rule out the old window
+    /// simply running out.
+    case windowRestartedLikely(Date)
     /// A reset credit came in after the post.
     case creditAdded(from: Int, to: Int)
     /// Nothing yet; Codex is checked every few minutes.
@@ -24,6 +27,7 @@ final class ResetTracker: ObservableObject {
         var credits: Int?
         var weeklyStart: Date?
         var weeklyUsed: Double?
+        var weeklyMinutes: Int?
     }
 
     @Published private(set) var credits: Int?
@@ -32,6 +36,8 @@ final class ResetTracker: ObservableObject {
     /// Spending a reset credit right now, and what Codex said last time.
     @Published private(set) var redeeming = false
     @Published private(set) var lastOutcome: String?
+    /// When a credit was spent from here: that restart is ours, not Tibo's.
+    private var spentAt: Date?
 
     private var timer: Timer?
     private var checking = false
@@ -59,7 +65,8 @@ final class ResetTracker: ObservableObject {
         // TIBODOG_MOCK=1 reads the history from TIBODOG_HOME and never asks Codex.
         guard !checking, !UsageStore.mock else { return }
         checking = true
-        Task.detached(priority: .utility) {
+        // A plain GCD thread, not the Swift concurrency pool: this blocks for up to 25s.
+        DispatchQueue.global(qos: .utility).async {
             let result = try? CodexUsageAPI.fetch()
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
@@ -83,12 +90,13 @@ final class ResetTracker: ObservableObject {
                 self.redeeming = false
                 self.lastOutcome = "reset"
                 self.credits = max(0, (self.credits ?? 1) - 1)
+                self.spentAt = Date()
                 UsageStore.shared.mockReset()
             }
             return
         }
         let key = UUID().uuidString
-        Task.detached(priority: .userInitiated) {
+        DispatchQueue.global(qos: .userInitiated).async {
             var outcome = (try? CodexUsageAPI.consumeResetCredit(idempotencyKey: key)) ?? "error"
             // A dropped connection may still have gone through: asking again with the same key is safe.
             if outcome == "error" { outcome = (try? CodexUsageAPI.consumeResetCredit(idempotencyKey: key)) ?? "error" }
@@ -97,6 +105,7 @@ final class ResetTracker: ObservableObject {
                     let tracker = ResetTracker.shared
                     tracker.redeeming = false
                     tracker.lastOutcome = outcome
+                    if outcome == "reset" { tracker.spentAt = Date() }
                     tracker.check()
                     UsageStore.shared.refresh(force: true)
                 }
@@ -111,7 +120,8 @@ final class ResetTracker: ObservableObject {
             guard let r = w.resetsAt, let m = w.durationMinutes else { return nil }
             return r.addingTimeInterval(-Double(m) * 60)
         }
-        let snap = Snapshot(at: Date(), credits: newCredits, weeklyStart: start, weeklyUsed: weekly?.utilization)
+        let snap = Snapshot(at: Date(), credits: newCredits, weeklyStart: start, weeklyUsed: weekly?.utilization,
+                            weeklyMinutes: weekly?.durationMinutes)
         let last = history.last
         credits = newCredits
         // Only keep changes: a new credit count or a weekly window that started over.
@@ -129,8 +139,15 @@ final class ResetTracker: ObservableObject {
         guard let latest = history.last else { return reachable ? .pending : .unknown }
         // A global reset starts the weekly window over (Codex's windows start at the reset, or at the
         // first use after it). Allow a little slack for clocks and propagation.
-        if let start = latest.weeklyStart, start >= postedAt.addingTimeInterval(-30 * 60) {
-            return .windowRestarted(start)
+        if let start = latest.weeklyStart, start >= postedAt.addingTimeInterval(-30 * 60),
+           !(spentAt.map { abs($0.timeIntervalSince(start)) < 10 * 60 } ?? false) {
+            // With a record from before the post, a reset is told apart from the old window running out.
+            if let before = history.last(where: { $0.at < postedAt }), let oldStart = before.weeklyStart {
+                let oldEnd = oldStart.addingTimeInterval(Double(before.weeklyMinutes ?? 10_080) * 60)
+                if !sameWindow(oldStart, start), oldEnd > start.addingTimeInterval(60) { return .windowRestarted(start) }
+            } else {
+                return .windowRestartedLikely(start)
+            }
         }
         let before = history.last { $0.at < postedAt }?.credits
         if let b = before, let after = history.filter({ $0.at >= postedAt }).compactMap(\.credits).max(), after > b {

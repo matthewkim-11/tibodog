@@ -7,9 +7,12 @@ struct NotchGeometry: Equatable {
     let notchWidth: CGFloat
     let notchHeight: CGFloat
 
-    static func detect() -> NotchGeometry {
+    /// nil while there's no screen at all (lid closed with nothing attached, mid-reconfiguration).
+    static func detect() -> NotchGeometry? {
         let screens = NSScreen.screens
-        let screen = screens.first { $0.safeAreaInsets.top > 0 } ?? NSScreen.main ?? screens[0]
+        guard let screen = screens.first(where: { $0.safeAreaInsets.top > 0 }) ?? NSScreen.main ?? screens.first else {
+            return nil
+        }
         let inset = screen.safeAreaInsets.top
         if inset > 0, let l = screen.auxiliaryTopLeftArea, let r = screen.auxiliaryTopRightArea {
             let w = screen.frame.width - l.width - r.width

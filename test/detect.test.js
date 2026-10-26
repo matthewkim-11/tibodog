@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isResetPost } from '../src/detect.js';
-import { parseFeed } from '../src/sources.js';
+import { parseFeed, isPostUrl, clean } from '../src/sources.js';
 
 test('barks at reset announcements', () => {
   for (const t of [
@@ -34,12 +34,13 @@ test('extra keywords always trigger', () => {
   assert.ok(isResetPost('free tokens for all', ['free tokens']));
 });
 
-test('parses rss and atom', () => {
-  const rss = `<rss><channel><item><title>Limits reset</title><description><![CDATA[<p>We reset Codex limits &amp; more</p>]]></description><link>https://x.com/thsottiaux/status/1</link><guid>1</guid></item></channel></rss>`;
-  const [a] = parseFeed(rss);
-  assert.equal(a.id, '1');
+test('parses rss and atom, keyed by the status id', () => {
+  const rss = `<rss><channel><item><title>Limits reset</title><description><![CDATA[<p>We reset Codex limits &amp; more</p>]]></description><link>https://nitter.net/thsottiaux/status/2114588174249071102#m</link><guid>https://nitter.net/thsottiaux/status/2114588174249071102#m</guid></item></channel></rss>`;
+  const [a] = parseFeed(rss, 'thsottiaux');
+  assert.equal(a.id, '2114588174249071102');
   assert.equal(a.text, 'We reset Codex limits & more');
-  const atom = `<feed><entry><id>tag:2</id><title>hi</title><link href="https://x.com/a/status/2"/></entry></feed>`;
-  const [b] = parseFeed(atom);
-  assert.equal(b.url, 'https://x.com/a/status/2');
+  assert.equal(a.url, 'https://x.com/thsottiaux/status/2114588174249071102');
+  const atom = `<feed><entry><id>tag:2</id><title>hi</title><link href="https://x.com/a/status/123456789"/></entry></feed>`;
+  const [b] = parseFeed(atom, 'a');
+  assert.equal(b.url, 'https://x.com/a/status/123456789');
 });

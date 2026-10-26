@@ -75,6 +75,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         quitOnSignals()
+        // Writing to a helper that just exited (codex, perl) must be an error we handle, not a SIGPIPE
+        // that kills the app.
+        signal(SIGPIPE, SIG_IGN)
         let store = UsageStore.shared
         store.start()
         rebuildPanel()
@@ -158,8 +161,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func rebuildPanel() {
         let store = UsageStore.shared
-        let geo = NotchGeometry.detect()
-        guard store.showNotch else {
+        // No notch wanted, or no screen right now: hide it; the next screen change brings it back.
+        guard store.showNotch, let geo = NotchGeometry.detect() else {
             panel?.orderOut(nil); panel = nil; geometry = nil
             return
         }

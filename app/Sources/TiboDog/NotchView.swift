@@ -11,8 +11,9 @@ struct NotchView: View {
 
     @State private var hovering = ProcessInfo.processInfo.environment["TIBODOG_EXPANDED"] == "1"
     @State private var collapseTask: Task<Void, Never>?
-    /// When the island opened: open long enough, the dog's post counts as read when it closes.
-    @State private var openedAt: Date?
+    /// The alert on screen while the island is open, and since when: shown long enough, it counts as read
+    /// when the island closes (one that came in at the last moment doesn't).
+    @State private var shown: (id: String, since: Date)?
 
     private let expandedWidth: CGFloat = 440
     // Beside the notch, each side is the gauge and what's next to it (the barking dog, the album art, the
@@ -54,22 +55,27 @@ struct NotchView: View {
         )
         .contentShape(Rectangle())
         .contextMenu { TiboDogMenu() }
+        .onChange(of: dog.alert?.id) { _, id in
+            if hovering { shown = id.map { ($0, Date()) } }
+        }
         .onHover { over in
             collapseTask?.cancel()
             if over {
-                if !hovering { openedAt = Date() }
+                if !hovering { shown = dog.alert.map { ($0.id, Date()) } }
                 withAnimation(.spring(response: 0.36, dampingFraction: 0.82)) { hovering = true }
             } else {
                 collapseTask = Task {
                     try? await Task.sleep(for: .milliseconds(180))
                     guard !Task.isCancelled else { return }
                     // A quick brush doesn't count: the dog keeps barking until the post was open for a moment.
-                    let read = openedAt.map { Date().timeIntervalSince($0) >= 1 } ?? false
+                    let read = shown.flatMap { s in
+                        s.id == dog.alert?.id && Date().timeIntervalSince(s.since) >= 1 ? s.id : nil
+                    }
                     withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
                         hovering = false
-                        if read { dog.markRead() }
+                        if let id = read { dog.markRead(id) }
                     }
-                    openedAt = nil
+                    shown = nil
                 }
             }
         }
@@ -322,7 +328,7 @@ struct NowPlayingRow: View {
     }
 
     private func mmss(_ s: Double) -> String {
-        let v = max(0, Int(s))
+        let v = s.isFinite ? Int(min(max(s, 0), 360_000)) : 0
         return String(format: "%d:%02d", v / 60, v % 60)
     }
 }
@@ -394,10 +400,11 @@ func barkStrength(_ t: TimeInterval) -> Double {
 struct BarkingDog: View {
     static let width: CGFloat = 30
     var size: CGFloat = 18
+    @ObservedObject private var dog = DogMonitor.shared
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { ctx in
-            let bark = barkStrength(ctx.date.timeIntervalSinceReferenceDate)
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !dog.barking)) { ctx in
+            let bark = dog.barking ? barkStrength(ctx.date.timeIntervalSinceReferenceDate) : 0
             HStack(spacing: 0) {
                 Text("🐕")
                     .font(.system(size: size))
@@ -425,10 +432,11 @@ struct BarkingDog: View {
 struct Woof: View {
     static let width: CGFloat = 24
     let text: String
+    @ObservedObject private var dog = DogMonitor.shared
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { ctx in
-            let bark = barkStrength(ctx.date.timeIntervalSinceReferenceDate)
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !dog.barking)) { ctx in
+            let bark = dog.barking ? barkStrength(ctx.date.timeIntervalSinceReferenceDate) : 0
             Text(text)
                 .font(.system(size: 11, weight: .heavy, design: .rounded))
                 .foregroundStyle(.yellow)
@@ -488,6 +496,9 @@ struct ResetCheck: View {
             case .windowRestarted(let start):
                 return (L("✅ 우리 계정에도 들어왔어요 · 주간 사용량이 \(clockText(start))에 새로 시작",
                           "✅ It reached your account · weekly usage started over at \(clockText(start))"), usageColor(0))
+            case .windowRestartedLikely(let start):
+                return (L("✅ 들어온 것 같아요 · 주간 사용량이 \(clockText(start))에 새로 시작 (그 전 기록이 없어 추정)",
+                          "✅ Looks like it reached you · weekly usage started over at \(clockText(start)) (no earlier record to compare)"), usageColor(0))
             case .creditAdded(let from, let to):
                 return (L("🎟️ 리셋권으로 들어왔어요 · \(from)개 → \(to)개", "🎟️ It came as a reset credit · \(from) → \(to)"), usageColor(0))
             case .pending:

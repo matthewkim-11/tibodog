@@ -151,10 +151,6 @@ final class UsageStore: ObservableObject {
             } catch UsageAPI.Failure.unauthorized where !refreshed {
                 creds = try await refreshAndSave(creds, source, allowRefresh: allowRefresh)
                 result = try await UsageAPI.fetch(token: creds.accessToken)
-            } catch UsageAPI.Failure.rateLimited where !refreshed && creds.canRefresh && allowRefresh {
-                // The endpoint answers 429 (not 401) to stale tokens; one refresh usually clears it.
-                creds = try await refreshAndSave(creds, source, allowRefresh: allowRefresh)
-                result = try await UsageAPI.fetch(token: creds.accessToken)
             }
             Log.info("usage ok: 5h=\(result.fiveHour?.percentText ?? "-") 7d=\(result.sevenDay?.percentText ?? "-")")
             publish(for: provider) { $0.usage = result; $0.lastUpdated = Date(); $0.backoffUntil = nil; $0.errorMessage = nil }
@@ -175,9 +171,20 @@ final class UsageStore: ObservableObject {
         guard allowRefresh else { throw StoreError.tokenExpired }
         Log.info("refreshing token…")
         let fresh = try await OAuth.refresh(creds)
-        do { try await CredentialStore.saveAsync(fresh, to: source) }
-        catch { Log.error("token saved in memory but not written back: \(error.localizedDescription)") }
-        Log.info("token refreshed and saved to \(source)")
+        // Claude Code (or a new /login) may have changed the stored login while we waited: theirs wins.
+        if let (stored, _) = try? await CredentialStore.loadAsync(),
+           stored.refreshToken != creds.refreshToken || stored.accessToken != creds.accessToken {
+            Log.info("stored login changed during refresh; using that one")
+            return stored
+        }
+        do {
+            try await CredentialStore.saveAsync(fresh, to: source)
+            Log.info("token refreshed and saved to \(source)")
+        } catch {
+            // The old refresh token is spent now: keep the new one until it can be written.
+            CredentialStore.holdUnsaved(fresh, replacing: creds, source: source)
+            Log.error("token refreshed but not written back yet: \(error.localizedDescription)")
+        }
         return fresh
     }
 

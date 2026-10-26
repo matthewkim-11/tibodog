@@ -13,6 +13,7 @@
     "app/Package.swift",
     "app/LICENSE",
     "app/Sources",
+    "app/Tests",
     "app/Resources",
     "app/Scripts",
     "app/Vendor",
@@ -25,7 +26,7 @@
     "test": "node --test test/*.test.js"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18.11"
   },
   "keywords": [
     "codex",

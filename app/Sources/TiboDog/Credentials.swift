@@ -64,7 +64,7 @@ struct Credentials {
 
 enum CredentialSource: CustomStringConvertible {
     case keychain              // direct SecItem access (may prompt for permission)
-    case securityCLI(String)   // /usr/bin/security (account name), no per-app prompt
+    case securityCLI(String?)  // /usr/bin/security (account name, if it could be read), no per-app prompt
     case file(URL)
 
     var description: String {
@@ -80,6 +80,7 @@ enum CredentialError: LocalizedError {
     case notFound
     case signedOut
     case malformed
+    case unknownAccount
     case keychain(OSStatus)
 
     var errorDescription: String? {
@@ -87,6 +88,7 @@ enum CredentialError: LocalizedError {
         case .notFound: return "Claude Code credentials not found. Run `claude` and sign in first."
         case .signedOut: return "Claude Code is signed out. Run `claude` in Terminal and /login."
         case .malformed: return "Credentials found but not in the expected format."
+        case .unknownAccount: return "Couldn't tell which Keychain account holds the Claude login, so it wasn't updated."
         case .keychain(let s):
             let msg = SecCopyErrorMessageString(s, nil) as String? ?? "OSStatus \(s)"
             return "Keychain error: \(msg)"
@@ -122,7 +124,31 @@ enum CredentialStore {
         }
     }
 
+    // A refreshed login that couldn't be written back yet. The refresh token rotates on refresh, so
+    // dropping it would sign Claude Code out; it's used (and saved again) until the store catches up.
+    private static let pendingLock = NSLock()
+    nonisolated(unsafe) private static var pending: (replaces: String?, fresh: Credentials, source: CredentialSource)?
+
+    static func holdUnsaved(_ fresh: Credentials, replacing old: Credentials, source: CredentialSource) {
+        pendingLock.lock(); defer { pendingLock.unlock() }
+        pending = (old.refreshToken, fresh, source)
+    }
+
     static func load() throws -> (Credentials, CredentialSource) {
+        let (stored, source) = try loadStored()
+        pendingLock.lock(); defer { pendingLock.unlock() }
+        guard let p = pending else { return (stored, source) }
+        // The store still has the login we refreshed from: ours is newer, try writing it again.
+        if stored.refreshToken == p.replaces {
+            if (try? save(p.fresh, to: p.source)) != nil { pending = nil; Log.info("refreshed token written back") }
+            return (p.fresh, p.source)
+        }
+        // Someone else (Claude Code, a new /login) changed it since: theirs wins.
+        pending = nil
+        return (stored, source)
+    }
+
+    private static func loadStored() throws -> (Credentials, CredentialSource) {
         // 1) /usr/bin/security: an Apple-signed tool already trusted for this item on most
         //    machines, so it reads the token without raising a per-app Keychain prompt.
         if let (data, account) = readViaSecurityCLI() {
@@ -159,12 +185,16 @@ enum CredentialStore {
     /// Runs `security` with stdout captured through a temp file. Using a file (not a Pipe)
     /// means we never have to drain a pipe while blocking a thread, so this is safe to call
     /// synchronously from the main actor without risking a pipe-buffer deadlock.
-    private static func runSecurity(_ args: [String]) -> (Int32, Data) {
+    /// `input` goes to its stdin; nothing secret ever goes in `args` (other users can see argv in `ps`).
+    /// Gives up after 10s: a Keychain dialog nobody answers must not stall refreshes forever.
+    private static func runSecurity(_ args: [String], input: Data? = nil) -> (Int32, Data) {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/usr/bin/security")
         proc.arguments = args
+        let stdin = Pipe()
+        proc.standardInput = input == nil ? FileHandle.nullDevice : stdin
         let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("islet-sec-\(UUID().uuidString)")
+            .appendingPathComponent("tibodog-sec-\(UUID().uuidString)")
         FileManager.default.createFile(atPath: tmp.path, contents: nil)
         guard let handle = try? FileHandle(forWritingTo: tmp) else { return (-1, Data()) }
         defer { try? FileManager.default.removeItem(at: tmp) }
@@ -175,14 +205,23 @@ enum CredentialStore {
         let done = DispatchSemaphore(value: 0)
         proc.terminationHandler = { _ in done.signal() }
         do { try proc.run() } catch { try? handle.close(); return (-1, Data()) }
-        done.wait()
+        if let input {
+            try? stdin.fileHandleForWriting.write(contentsOf: input)
+            try? stdin.fileHandleForWriting.close()
+        }
+        if done.wait(timeout: .now() + 10) == .timedOut {
+            proc.terminate()
+            _ = done.wait(timeout: .now() + 2)
+            try? handle.close()
+            return (-1, Data())
+        }
         try? handle.close()
         let data = (try? Data(contentsOf: tmp)) ?? Data()
         return (proc.terminationStatus, data)
     }
 
     /// Reads the raw JSON blob and the account name it is stored under, if the tool succeeds.
-    private static func readViaSecurityCLI() -> (Data, String)? {
+    private static func readViaSecurityCLI() -> (Data, String?)? {
         let (code, data) = runSecurity(["find-generic-password", "-s", service, "-w"])
         guard code == 0 else { return nil }
         var blob = data
@@ -190,7 +229,7 @@ enum CredentialStore {
         guard !blob.isEmpty else { return nil }
         // The account is needed to update the same item in place later.
         let (mcode, meta) = runSecurity(["find-generic-password", "-s", service, "-g"])
-        var account = NSUserName()
+        var account: String?
         if mcode == 0, let text = String(data: meta, encoding: .utf8),
            let range = text.range(of: "\"acct\"<blob>=\"") {
             let rest = text[range.upperBound...]
@@ -199,10 +238,17 @@ enum CredentialStore {
         return (blob, account)
     }
 
-    private static func writeViaSecurityCLI(_ data: Data, account: String) throws {
-        // -U updates the existing item in place, preserving its access control.
-        guard let json = String(data: data, encoding: .utf8) else { throw CredentialError.malformed }
-        let (code, _) = runSecurity(["add-generic-password", "-U", "-s", service, "-a", account, "-w", json])
+    private static func writeViaSecurityCLI(_ data: Data, account: String?) throws {
+        // Guessing the account would add a second item beside Claude Code's instead of updating it.
+        guard let account else { throw CredentialError.unknownAccount }
+        guard let json = String(data: data, encoding: .utf8), !json.contains("\n") else { throw CredentialError.malformed }
+        // -U updates the existing item in place, preserving its access control. The command goes in
+        // through `security -i` on stdin, so the token never shows up in a process list.
+        func quoted(_ s: String) -> String {
+            "\"" + s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
+        }
+        let command = "add-generic-password -U -s \(quoted(service)) -a \(quoted(account)) -w \(quoted(json))\n"
+        let (code, _) = runSecurity(["-i"], input: Data(command.utf8))
         guard code == 0 else { throw CredentialError.keychain(errSecAuthFailed) }
     }
 

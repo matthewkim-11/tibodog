@@ -20,8 +20,8 @@ struct UsageWindow: Equatable {
         return "\(m)M"
     }
 
-    var fraction: Double { min(max(utilization / 100, 0), 1) }
-    var percentText: String { "\(Int(utilization.rounded()))%" }
+    var fraction: Double { utilization.isFinite ? min(max(utilization / 100, 0), 1) : 0 }
+    var percentText: String { utilization.isFinite ? "\(Int(min(max(utilization, -999), 9999).rounded()))%" : "–" }
 }
 
 /// Snapshot of every window the endpoint returned.

@@ -1,10 +1,11 @@
 // Plays the bundled bark recording, or a synthesized bark as a fallback.
 
 import { spawn } from 'node:child_process';
-import { writeFileSync, existsSync } from 'node:fs';
+import { writeFileSync, existsSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isPostUrl } from './sources.js';
 
 const RATE = 22050;
 
@@ -58,7 +59,8 @@ export function makeBarkWav(count = 2) {
 function players(file) {
   if (process.platform === 'darwin') return [['afplay', [file]]];
   if (process.platform === 'win32') {
-    return [['powershell', ['-NoProfile', '-c', `(New-Object Media.SoundPlayer '${file}').PlaySync()`]]];
+    // The path goes in through the environment, so a quote in it can't change the command.
+    return [['powershell', ['-NoProfile', '-c', '(New-Object Media.SoundPlayer $env:TIBODOG_WAV).PlaySync()'], { TIBODOG_WAV: file }]];
   }
   return [
     ['paplay', [file]],
@@ -67,11 +69,16 @@ function players(file) {
   ];
 }
 
-function run(cmd, args) {
+// Never throws: a missing player, a bad argument or a crash just means "didn't work".
+function run(cmd, args, env) {
   return new Promise((resolve) => {
-    const p = spawn(cmd, args, { stdio: 'ignore' });
-    p.on('error', () => resolve(false));
-    p.on('exit', (code) => resolve(code === 0));
+    try {
+      const p = spawn(cmd, args, { stdio: 'ignore', env: env ? { ...process.env, ...env } : undefined });
+      p.on('error', () => resolve(false));
+      p.on('exit', (code) => resolve(code === 0));
+    } catch {
+      resolve(false);
+    }
   });
 }
 
@@ -82,15 +89,15 @@ let cached = null;
 
 function synthFile() {
   if (!cached) {
-    cached = join(tmpdir(), `tibodog-bark-${process.pid}.wav`);
+    cached = join(mkdtempSync(join(tmpdir(), 'tibodog-')), 'bark.wav');
     writeFileSync(cached, makeBarkWav(3));
   }
   return cached;
 }
 
 async function playOnce(file) {
-  for (const [cmd, args] of players(file)) {
-    if (await run(cmd, args)) return true;
+  for (const [cmd, args, env] of players(file)) {
+    if (await run(cmd, args, env)) return true;
   }
   return false;
 }
@@ -119,7 +126,9 @@ export function notify(title, message) {
   return Promise.resolve(false);
 }
 
+// Only ever a post on x.com (see sources.js): never a file, an app or another scheme from a feed.
 export function openUrl(url) {
+  if (!isPostUrl(url)) return Promise.resolve(false);
   const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'explorer' : 'xdg-open';
   return run(cmd, [url]);
 }

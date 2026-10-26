@@ -58,8 +58,11 @@ enum CodexUsageAPI {
         try process.run()
         let pid = process.processIdentifier
         defer {
+            // codex may start helpers of its own (MCP servers): they go when it does.
+            let helpers = children(of: pid)
             try? input.fileHandleForWriting.close()
             if process.isRunning { process.terminate() }
+            for child in helpers { kill(child, SIGTERM) }
             // Do not let a hung child accumulate across refreshes.
             let deadline = Date().addingTimeInterval(1)
             while process.isRunning && Date() < deadline { Thread.sleep(forTimeInterval: 0.01) }
@@ -87,8 +90,9 @@ enum CodexUsageAPI {
             while let newline = buffer.firstIndex(of: 10) {
                 let line = buffer.prefix(upTo: newline)
                 buffer.removeSubrange(...newline)
-                guard let message = try JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
-                guard let id = message["id"] as? Int else { continue }
+                // Skip anything that isn't a reply to us: log lines, blank lines, codex's own requests.
+                guard let message = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any],
+                      message["method"] == nil, let id = message["id"] as? Int else { continue }
                 guard message["error"] == nil else { throw Failure.unavailable }
                 if id == 1 {
                     try send(["method": "initialized"])
@@ -102,6 +106,12 @@ enum CodexUsageAPI {
             }
         }
         throw Failure.timeout
+    }
+
+    private static func children(of pid: pid_t) -> [pid_t] {
+        var buffer = [pid_t](repeating: 0, count: 64)
+        let count = proc_listchildpids(pid, &buffer, Int32(MemoryLayout<pid_t>.size * buffer.count))
+        return count > 0 ? Array(buffer.prefix(Int(count))) : []
     }
 
     static func decode(_ result: [String: Any]) throws -> (usage: Usage, plan: String?, resetCredits: Int?) {
